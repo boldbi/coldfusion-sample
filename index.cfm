@@ -1,1 +1,2 @@
-<!--- Please insert your code here --->
+<!--- Bold BI Embed - Main Entry Point --->
+<cfinclude template="BoldBIEmbed.html">

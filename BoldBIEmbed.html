@@ -4,7 +4,7 @@
 	<title>Bold BI Embed</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" charset="utf-8" />
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script type="text/javascript" src="https://cdn.boldbi.com/embedded-sdk/v6.1.8/boldbi-embed.js"></script>
+    <script type="text/javascript" src="https://cdn.boldbi.com/embedded-sdk/latest/boldbi-embed.js"></script>
     <style type="text/css">
         body {
             margin: 0;
@@ -21,22 +21,87 @@
     </div>
     <script>
     	$(document).ready(function(){
-    		var dashboard = BoldBI.create({
-                serverUrl: "http://localhost:12345/bi/site/site1",
-                dashboardId: "",
-                embedContainerId: "sample_dashboard",
-                embedType: BoldBI.EmbedType.Component,
-                environment: BoldBI.Environment.Enterprise,
-                width: "100%",
-                height: window.innerHeight + "px",
-                expirationTime: 100000,
-                authorizationServer: {
-                    url: "embedDetails.cfc?method=GetEmbedDetails&returnformat=json"
-                }
-            });
-
-            dashboard.loadDashboard();
+    		getEmbedTokenFromBackend();
     	});
+
+    	function getEmbedTokenFromBackend() {
+    		$.ajax({
+    			url: 'embedDetails.cfc?method=tokenGeneration',
+    			type: 'POST',
+    			data: {},
+    			dataType: 'json',
+    			timeout: 15000,
+    			success: function(data) {
+    				if (data.SUCCESS && data.ACCESS_TOKEN) {
+    					console.log('Embed token retrieved successfully from backend');
+    					initializeBoldBIDashboard(data);
+    				} else {
+    					displayError(data, 'Failed to retrieve embed token from backend');
+    				}
+    			},
+    			error: function(jqXHR, textStatus, errorThrown) {
+    				console.error('Error retrieving embed token:', textStatus, errorThrown);
+    				var errorHTML = '<div style="padding: 20px; background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; border-radius: 4px;">' +
+    					'<h3>Error Retrieving Embed Token</h3>' +
+    					'<p>Failed to retrieve embed configuration and token from the backend.</p>' +
+    					'<p><strong>Status:</strong> ' + textStatus + '</p>' +
+    					'<p><strong>Details:</strong> ' + errorThrown + '</p>' +
+    					'<p>Please ensure the ColdFusion backend is running and embedConfig.json is properly configured.</p>' +
+    					'</div>';
+    				$('#sample_dashboard').html(errorHTML);
+    			}
+    		});
+    	}
+
+    	function initializeBoldBIDashboard(embedData) {
+    		var serverUrl = embedData.SERVERURL;
+    		if (embedData.SITEIDENTIFIER && embedData.SITEIDENTIFIER.trim() !== '') {
+    			serverUrl = embedData.SERVERURL + '/' + embedData.SITEIDENTIFIER;
+    		}
+
+    		console.log('Initializing Bold BI Dashboard:', {
+    			serverUrl: serverUrl,
+    			dashboardId: embedData.DASHBOARDID,
+    			tokenReceived: !!embedData.ACCESS_TOKEN
+    		});
+
+    		try {
+    			var dashboard = BoldBI.create({
+    				serverUrl: serverUrl,
+    				dashboardId: embedData.DASHBOARDID,
+    				embedContainerId: "sample_dashboard",
+    				environment: BoldBI.Environment.Enterprise,
+    				embedToken: embedData.ACCESS_TOKEN,
+    				expirationTime: 100000
+    			});
+
+    			dashboard.loadDashboard();
+    		} catch (error) {
+    			console.error('Error initializing Bold BI:', error);
+    			var errorHTML = '<div style="padding: 20px; background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; border-radius: 4px;">' +
+    				'<h3>Error Initializing Dashboard</h3>' +
+    				'<p>Failed to initialize the Bold BI dashboard.</p>' +
+    				'<p><strong>Error:</strong> ' + error.message + '</p>' +
+    				'<p>Please check the console for more details.</p>' +
+    				'</div>';
+    			$('#sample_dashboard').html(errorHTML);
+    		}
+    	}
+
+    	function displayError(response, defaultMessage) {
+    		var errorMessage = response.message || defaultMessage;
+    		var errorDetail = response.error || 'Unknown error';
+    		var helpLink = response.helpLink ? '<p><a href="' + response.helpLink + '" target="_blank">Get help from Bold BI documentation</a></p>' : '';
+    		
+    		var errorHTML = '<div style="padding: 20px; background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; border-radius: 4px;">' +
+    			'<h3>Error</h3>' +
+    			'<p><strong>' + errorDetail + '</strong></p>' +
+    			'<p>' + errorMessage + '</p>' +
+    			helpLink +
+    			'</div>';
+    		
+    		$('#sample_dashboard').html(errorHTML);
+    	}
     </script>
 </body>
 </html>
